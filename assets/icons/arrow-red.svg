@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="arrows" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 121.41 80.8">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: none;
+      }
+
+      .cls-2 {
+        fill: #ea5353;
+      }
+
+      .cls-3 {
+        fill: #ea5555;
+      }
+
+      .cls-4 {
+        fill: #ea5252;
+      }
+
+      .cls-5 {
+        fill: #ea5454;
+      }
+
+      .cls-6 {
+        fill: url(#linear-gradient);
+      }
+
+      .cls-7 {
+        fill: #ea4a4a;
+      }
+
+      .cls-8 {
+        fill: #ea4e4e;
+      }
+
+      .cls-9 {
+        fill: #ea4b4b;
+      }
+
+      .cls-10 {
+        fill: #ea5151;
+      }
+
+      .cls-11 {
+        fill: #ea4d4d;
+      }
+
+      .cls-12 {
+        fill: #ea5756;
+      }
+
+      .cls-13 {
+        fill: #ea4c4c;
+      }
+
+      .cls-14 {
+        fill: #ea4949;
+      }
+
+      .cls-15 {
+        fill: #ea5050;
+      }
+
+      .cls-16 {
+        fill: #ea5655;
+      }
+
+      .cls-17 {
+        fill: #ea4f4f;
+      }
+
+      .cls-18 {
+        clip-path: url(#clippath);
+      }
+
+      .cls-19 {
+        fill: #ea4d4c;
+      }
+    </style>
+    <linearGradient id="linear-gradient" x1="0" y1="43.17" x2="128.48" y2="43.17" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e8e5df"/>
+      <stop offset=".33" stop-color="#e89996"/>
+      <stop offset=".7" stop-color="#ea4949"/>
+    </linearGradient>
+    <clipPath id="clippath">
+      <polygon class="cls-1" points="81.52 34.43 121.41 34.66 101.67 0 81.52 34.43"/>
+    </clipPath>
+  </defs>
+  <g id="greenland_arrow" data-name="greenland arrow">
+    <g>
+      <path class="cls-6" d="M20,80.8H0C0,60.7,7.83,41.8,22.04,27.59,36.26,13.37,55.16,5.54,75.26,5.54c0,0,0,0,0,0,8.66,0,17.16,1.46,25.25,4.34l-6.71,18.84c-5.93-2.11-12.17-3.18-18.54-3.18-14.76,0-28.64,5.75-39.07,16.19s-16.19,24.31-16.19,39.07Z"/>
+      <g class="cls-18">
+        <rect class="cls-12" x="81.52" y="0" width=".15" height="34.66"/>
+        <rect class="cls-16" x="81.67" y="0" width=".58" height="34.66"/>
+        <rect class="cls-3" x="82.25" y="0" width=".58" height="34.66"/>
+        <rect class="cls-5" x="82.83" y="0" width=".58" height="34.66"/>
+        <rect class="cls-2" x="83.41" y="0" width=".58" height="34.66"/>
+        <rect class="cls-4" x="83.99" y="0" width=".58" height="34.66"/>
+        <rect class="cls-10" x="84.57" y="0" width=".58" height="34.66"/>
+        <rect class="cls-15" x="85.15" y="0" width=".58" height="34.66"/>
+        <rect class="cls-17" x="85.73" y="0" width=".58" height="34.66"/>
+        <rect class="cls-8" x="86.31" y="0" width=".58" height="34.66"/>
+        <rect class="cls-11" x="86.89" y="0" width=".58" height="34.66"/>
+        <rect class="cls-19" x="87.47" y="0" width=".58" height="34.66"/>
+        <rect class="cls-13" x="88.05" y="0" width=".58" height="34.66"/>
+        <rect class="cls-9" x="88.63" y="0" width=".58" height="34.66"/>
+        <rect class="cls-7" x="89.2" y="0" width=".58" height="34.66"/>
+        <rect class="cls-14" x="89.78" y="0" width=".58" height="34.66"/>
+        <rect class="cls-14" x="90.36" y="0" width="31.04" height="34.66"/>
+      </g>
+    </g>
+  </g>
+</svg>

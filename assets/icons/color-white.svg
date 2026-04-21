@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="effect_text" data-name="effect text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 70.63 70.63">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #f9f9f7;
+      }
+    </style>
+  </defs>
+  <rect class="cls-1" x=".4" y=".4" width="69.83" height="69.83"/>
+  <path d="M70.63,70.63H0V0h70.63v70.63ZM.8,69.83h69.03V.8H.8v69.04Z"/>
+</svg>
