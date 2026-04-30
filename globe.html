@@ -53,14 +53,14 @@
   canvas.three { display: block; width: 100%; height: 100%; }
 
   /* Overlay layer (HTML markers, labels) */
-  #overlay { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  #overlay { position: fixed; inset: 0; pointer-events: none; z-index: 4; }
   .marker { position: absolute; transform: translate(-50%, -50%);
     pointer-events: auto; cursor: pointer;
     transition: opacity 0.15s ease; }
   .marker.secondary .icon-wrap {
     width: 50px; height: 50px;
   }
-  .marker.secondary img { width: 32px; height: 32px; }
+  .marker.secondary img { width: 38px; height: 38px; }
   .marker.secondary .label {
     font-size: 10px; padding: 2px 6px;
   }
@@ -91,7 +91,7 @@
     0%,100% { box-shadow: 0 4px 16px var(--accent-glow), 0 0 0 0 var(--accent-glow-strong); }
     50% { box-shadow: 0 4px 16px var(--accent-glow), 0 0 0 10px var(--accent-glow-fade); }
   }
-  .marker img { width: 43px; height: 43px; object-fit: contain; pointer-events: none; }
+  .marker img { width: 52px; height: 52px; object-fit: contain; pointer-events: none; }
   .marker .label {
     position: absolute; left: 50%; top: 100%;
     transform: translateX(-50%);
@@ -226,9 +226,10 @@
   }
   #title-panel {
     top: 20px; left: 20px;
-    max-width: 340px;
+    max-width: 280px;
     padding-right: 50px;
     position: fixed;
+    pointer-events: auto;
   }
   #title-panel h1 {
     font-size: 18px; font-weight: 700;
@@ -272,10 +273,16 @@
 
   /* Bottom controls */
   #controls {
-    position: fixed; bottom: 0; left: 0; right: 0; z-index: 3;
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 5;
     padding: 18px 24px 24px;
-    background: linear-gradient(to top, rgba(10,14,20,0.95) 30%, rgba(10,14,20,0));
+    background: #0a0a0a;
+    border-top: 1px solid #2a2a2a;
+    color: #f5f3ee;
   }
+  #controls #temp-label { color: rgba(245,243,238,0.55); }
+  #controls #temp-display { color: #ffffff; }
+  #controls #temp-ticks { color: rgba(245,243,238,0.45); }
+  #help { color: rgba(245,243,238,0.6); border-color: rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); }
   #temp-row {
     display: flex; align-items: center; gap: 16px;
     max-width: 900px; margin: 0 auto;
@@ -516,7 +523,13 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
     { from: 'east-antarctic', to: 'amoc', type: 'uncertain', strength: 1, tag: 'Uncertain',
       desc: 'Southern freshwater input may affect circulation.' },
     { from: 'west-antarctic', to: 'coral-gbr', type: 'uncertain', strength: 1, tag: 'Uncertain',
-      desc: 'Sea level rise impact on reefs is debated.' }
+      desc: 'Sea level rise impact on reefs is debated.' },
+    { from: 'amoc', to: 'glaciers-andes', type: 'destabilize', strength: 2, tag: 'Destabilizing',
+      desc: 'AMOC-shifted rainfall reduces snowfall on the tropical Andes.' },
+    { from: 'amoc', to: 'coral-caribbean', type: 'uncertain', strength: 1, tag: 'Uncertain',
+      desc: 'Atlantic circulation changes alter Caribbean reef heat patterns.' },
+    { from: 'monsoon-sasia', to: 'coral-triangle', type: 'uncertain', strength: 1, tag: 'Uncertain',
+      desc: 'Disrupted monsoon upwelling changes reef temperatures.' }
   ];
 
   // Coastal effect markers — appear when their parent tipping point activates.
@@ -840,6 +853,7 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
     edgeRoots.forEach(er => {
       er.mat.color.copy(edgeColors[er.edge.type]);
       er.headMat.color.copy(edgeColors[er.edge.type]);
+      if (er.haloMat) er.haloMat.color.copy(edgeColors[er.edge.type]);
       if (er.pulseMat) er.pulseMat.color.copy(edgeColors[er.edge.type]);
     });
   }
@@ -866,9 +880,9 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
     const strengthSize = 0.7 + (s - 1) * 0.25;       // dash thickness multiplier (1.7x at s=5)
 
     let dashSize, gapSize;
-    if (edge.type === 'destabilize') { dashSize = 0.025 * strengthSize; gapSize = 0.018; }
-    else if (edge.type === 'stabilize') { dashSize = 0.06 * strengthSize; gapSize = 0.03; }
-    else { dashSize = 0.008 * strengthSize; gapSize = 0.012; }
+    if (edge.type === 'destabilize') { dashSize = 0.05 * strengthSize; gapSize = 0.025; }
+    else if (edge.type === 'stabilize') { dashSize = 0.12 * strengthSize; gapSize = 0.045; }
+    else { dashSize = 0.016 * strengthSize; gapSize = 0.018; }
 
     const mat = new THREE.LineDashedMaterial({
       color: edgeColors[edge.type].clone(),
@@ -883,6 +897,19 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
 
     const line = new THREE.Line(geo, mat);
     line.computeLineDistances();
+
+    // Tube under the dashed line for perceived thickness (2x).
+    // Radius scales with strength; very subtle opacity so it acts as a halo.
+    const haloCurve = new THREE.CatmullRomCurve3(pts);
+    const haloRadius = 0.0035 + s * 0.0015;  // ~5-9px equivalent
+    const haloGeo = new THREE.TubeGeometry(haloCurve, EDGE_SEGMENTS, haloRadius, 8, false);
+    const haloMat = new THREE.MeshBasicMaterial({
+      color: edgeColors[edge.type].clone(),
+      transparent: true,
+      opacity: 0,
+      depthWrite: false
+    });
+    const tube = new THREE.Mesh(haloGeo, haloMat);
 
     // Arrowhead
     const headGeo = new THREE.ConeGeometry(ARROW_HEAD_SIZE * 0.4 * strengthSize, ARROW_HEAD_SIZE * strengthSize, 8);
@@ -930,6 +957,7 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
 
     return {
       edge, group, line, head, hitMesh, mat, headMat,
+      tube, haloMat,
       points: pts, midpoint: mid,
       visible: false, opacity: 0,
       strengthOpacity: strengthOpacity,
@@ -1193,6 +1221,19 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
     document.getElementById('info-panel').classList.remove('visible');
   });
 
+  // Click outside panel/markers closes the info panel
+  document.addEventListener('click', e => {
+    if (!selectedNodeId) return;
+    const panel = document.getElementById('info-panel');
+    if (panel.contains(e.target)) return;          // click inside panel
+    if (e.target.closest('.marker')) return;        // click on a node
+    if (e.target.closest('#palette-toggle')) return;
+    if (e.target.closest('#temp-slider')) return;
+    selectedNodeId = null;
+    Object.values(markerEls).forEach(m => m.el.classList.remove('selected'));
+    panel.classList.remove('visible');
+  });
+
   // ============================================================
   // INTERACTION — drag to rotate, scroll to zoom
   // ============================================================
@@ -1200,7 +1241,7 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
   let rotX = 0.2, rotY = 0;
   let isDragging = false;
   let lastX = 0, lastY = 0;
-  let zoom = 3;
+  let zoom = 2.4;
   let velX = 0, velY = 0;
   const ZOOM_MIN = 1.5, ZOOM_MAX = 6;
 
@@ -1317,7 +1358,9 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
       }
       const finalOpacity = er.opacity * er.strengthOpacity;
       er.mat.opacity = finalOpacity;
-      er.headMat.opacity = finalOpacity;
+      er.haloMat.opacity = finalOpacity * 0.30;  // halo thickness
+      er.headMat.opacity = 0;  // arrowheads disabled
+      er.head.visible = false;
 
       // Marching ants: shift lineDistances by a time-based offset, modulo
       // (dashSize+gapSize) so the dash pattern appears to travel source→target.
@@ -1378,24 +1421,30 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
       const behind = isBehindGlobe(worldPos);
       m.el.classList.toggle('behind', behind);
       // Scale slightly with zoom
-      const scale = 3 / zoom;
-      m.wrap.style.transform = `scale(${Math.max(0.6, Math.min(1.2, scale))})`;
+      // Zoom-responsive scaling: markers grow when zoomed in (see illustration detail),
+      // shrink when zoomed out (don't dominate the globe).
+      const rawScale = Math.pow(2.2 / zoom, 1.6);
+      const scale = Math.max(0.45, Math.min(2.0, rawScale));
+      m.wrap.style.transform = `scale(${scale})`;
     });
 
     // Effect target markers
     effectTargets.forEach(et => {
-      if (!et.visible || et.opacity < 0.2) {
+      // Hide entirely when parent not tipped or fading out below visible threshold
+      if (!et.visible || et.opacity < 0.05) {
         et.el.classList.add('hidden');
+        et.el.style.opacity = '0';     // override any stale inline opacity
+        et.el.style.display = 'none';
         return;
       }
       et.el.classList.remove('hidden');
+      et.el.style.display = '';
       const worldPos = et.pos3D.clone().applyEuler(globeRoot.rotation);
       const screen = projectToScreen(worldPos);
       if (screen.z > 1 || screen.z < -1) {
         et.el.style.display = 'none';
         return;
       }
-      et.el.style.display = '';
       et.el.style.left = screen.x + 'px';
       et.el.style.top = screen.y + 'px';
       const behind = isBehindGlobe(worldPos);
@@ -1404,24 +1453,40 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
     });
 
     // Edge labels
+    const winW = window.innerWidth, winH = window.innerHeight;
     edgeRoots.forEach(er => {
       if (!er.visible || er.opacity < 0.3) {
         er.labelEl.classList.add('behind');
         er.labelEl.style.display = 'none';
+        er.labelEl.classList.remove('centered');
         return;
       }
       const worldPos = er.midpoint.clone().applyEuler(globeRoot.rotation);
       const screen = projectToScreen(worldPos);
-      if (screen.z > 1 || screen.z < -1) {
-        er.labelEl.style.display = 'none';
-        return;
-      }
-      er.labelEl.style.display = '';
-      er.labelEl.style.left = screen.x + 'px';
-      er.labelEl.style.top = screen.y + 'px';
+      const offscreen = (screen.z > 1 || screen.z < -1) ||
+                        screen.x < 20 || screen.x > winW - 20 ||
+                        screen.y < 20 || screen.y > winH - 20;
       const behind = isBehindGlobe(worldPos);
-      er.labelEl.classList.toggle('behind', behind);
-      er.labelEl.style.opacity = behind ? 0 : er.opacity;
+
+      // If midpoint is offscreen OR behind globe, switch to centered tooltip mode
+      // (label pinned to viewport center on hover regardless of dot position).
+      // The dot itself still hides — only the .label inside repositions via .centered class.
+      if (offscreen || behind) {
+        er.labelEl.classList.add('centered');
+        er.labelEl.style.display = '';
+        // Park the dot off-screen so its visual goes away but el stays interactive
+        er.labelEl.style.left = '-100px';
+        er.labelEl.style.top = '-100px';
+        er.labelEl.style.opacity = 0;  // dot hidden; .label has its own pinning
+        er.labelEl.classList.remove('behind');
+      } else {
+        er.labelEl.classList.remove('centered');
+        er.labelEl.style.display = '';
+        er.labelEl.style.left = screen.x + 'px';
+        er.labelEl.style.top = screen.y + 'px';
+        er.labelEl.classList.remove('behind');
+        er.labelEl.style.opacity = er.opacity;
+      }
     });
   }
 
