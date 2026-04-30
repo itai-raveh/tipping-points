@@ -95,7 +95,7 @@
   .marker .label {
     position: absolute; left: 50%; top: 100%;
     transform: translateX(-50%);
-    margin-top: 6px;
+    margin-top: 10px;
     font-size: 11px; font-weight: 600;
     color: var(--text); white-space: nowrap;
     background: var(--panel);
@@ -118,8 +118,9 @@
     max-height: 16px; opacity: 1; margin-top: 1px;
   }
   .marker .threshold { display: none; }
-  .marker.behind { opacity: 0.15; }
+  .marker.behind { opacity: 0.05; }
   .marker.behind .icon-wrap { animation: none; }
+  .marker.secondary.behind { opacity: 0.05; }
 
   /* Effect target markers — dashed circle on coasts indicating consequence */
   .effect-target {
@@ -664,42 +665,10 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
     ctx.fillStyle = getCss('--ocean');
     ctx.fillRect(0, 0, W, H);
 
-    // Graticule — standard 30° spacing
-    const gridColor = getCss('--grid');
-    const equatorColor = getCss('--equator');
+    // Graticule lines now drawn as 3D vector geometry, not on this canvas.
 
-    ctx.lineWidth = 1.2;
-    // Latitude lines every 30° (skip poles)
-    for (let lat = -60; lat <= 60; lat += 30) {
-      ctx.strokeStyle = (lat === 0) ? equatorColor : gridColor;
-      ctx.lineWidth = (lat === 0) ? 1.5 : 1;
-      const y = (90 - lat) / 180 * H;
-      ctx.beginPath();
-      ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-    }
-    // Tropics (±23.5°) — slightly stronger than regular grid
-    ctx.strokeStyle = gridColor;
-    ctx.lineWidth = 1;
-    [-23.5, 23.5].forEach(lat => {
-      const y = (90 - lat) / 180 * H;
-      ctx.setLineDash([6, 6]);
-      ctx.beginPath();
-      ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-      ctx.setLineDash([]);
-    });
-    // Longitude lines every 30°
-    for (let lng = -150; lng <= 150; lng += 30) {
-      ctx.strokeStyle = (lng === 0) ? equatorColor : gridColor;
-      ctx.lineWidth = (lng === 0) ? 1.5 : 1;
-      const x = (lng + 180) / 360 * W;
-      ctx.beginPath();
-      ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-    }
-
-    // Landmasses
+    // Landmasses (filled only — strokes drawn as 3D vector geometry)
     ctx.fillStyle = getCss('--land');
-    ctx.strokeStyle = getCss('--land-stroke');
-    ctx.lineWidth = 1;
     for (const ring of LAND_POLYS) {
       ctx.beginPath();
       for (let i = 0; i < ring.length; i++) {
@@ -710,7 +679,6 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
       }
       ctx.closePath();
       ctx.fill();
-      ctx.stroke();
     }
 
     const tex = new THREE.CanvasTexture(cv);
@@ -724,6 +692,75 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
   const sphereMat = new THREE.MeshBasicMaterial({ map: basemapTex });
   const sphere = new THREE.Mesh(sphereGeom, sphereMat);
   globeRoot.add(sphere);
+
+  // === Vector coastline overlay ===
+  // Render LAND_POLYS rings as real 3D line segments on the sphere surface.
+  // Stays sharp at any zoom — fixes raster pixelation and graticule artifacts.
+  const coastRadius = RADIUS + 0.0015;
+  const coastGeo = new THREE.BufferGeometry();
+  const coastPositions = [];
+  for (const ring of LAND_POLYS) {
+    for (let i = 0; i < ring.length - 1; i++) {
+      const [lng1, lat1] = ring[i];
+      const [lng2, lat2] = ring[i + 1];
+      const v1 = latLngToVec3(lat1, lng1, coastRadius);
+      const v2 = latLngToVec3(lat2, lng2, coastRadius);
+      // Interpolate along great-circle for smoother lines
+      const steps = 2;
+      for (let s = 0; s < steps; s++) {
+        const t1 = s / steps;
+        const t2 = (s + 1) / steps;
+        const va = v1.clone().lerp(v2, t1).normalize().multiplyScalar(coastRadius);
+        const vb = v1.clone().lerp(v2, t2).normalize().multiplyScalar(coastRadius);
+        coastPositions.push(va.x, va.y, va.z, vb.x, vb.y, vb.z);
+      }
+    }
+  }
+  coastGeo.setAttribute('position', new THREE.Float32BufferAttribute(coastPositions, 3));
+  const coastMat = new THREE.LineBasicMaterial({
+    color: new THREE.Color(getCss('--land-stroke') || '#c0bbb1'),
+    transparent: true,
+    opacity: 0.85,
+    depthWrite: false
+  });
+  const coastLines = new THREE.LineSegments(coastGeo, coastMat);
+  globeRoot.add(coastLines);
+
+  // === Vector graticule (latitude/longitude lines) ===
+  const gratRadius = RADIUS + 0.0010;
+  const gratGeo = new THREE.BufferGeometry();
+  const gratPositions = [];
+  function addLatitudeLine(lat, segments) {
+    for (let i = 0; i < segments; i++) {
+      const lng1 = -180 + (360 * i / segments);
+      const lng2 = -180 + (360 * (i + 1) / segments);
+      const v1 = latLngToVec3(lat, lng1, gratRadius);
+      const v2 = latLngToVec3(lat, lng2, gratRadius);
+      gratPositions.push(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z);
+    }
+  }
+  function addLongitudeLine(lng, segments) {
+    for (let i = 0; i < segments; i++) {
+      const lat1 = -85 + (170 * i / segments);
+      const lat2 = -85 + (170 * (i + 1) / segments);
+      const v1 = latLngToVec3(lat1, lng, gratRadius);
+      const v2 = latLngToVec3(lat2, lng, gratRadius);
+      gratPositions.push(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z);
+    }
+  }
+  // Latitudes every 30° plus equator emphasis (we'll dim others via shared opacity)
+  for (let lat = -60; lat <= 60; lat += 30) addLatitudeLine(lat, 96);
+  // Longitudes every 30°
+  for (let lng = -150; lng <= 180; lng += 30) addLongitudeLine(lng, 64);
+  gratGeo.setAttribute('position', new THREE.Float32BufferAttribute(gratPositions, 3));
+  const gratMat = new THREE.LineBasicMaterial({
+    color: new THREE.Color('#000000'),
+    transparent: true,
+    opacity: 0.07,
+    depthWrite: false
+  });
+  const gratLines = new THREE.LineSegments(gratGeo, gratMat);
+  globeRoot.add(gratLines);
 
   // ============================================================
   // HEAT OVERLAY (radial gradients from tipped nodes)
@@ -946,7 +983,7 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
     group.visible = false;
     globeRoot.add(group);
 
-    const mid = pts[Math.floor(pts.length / 2)].clone().normalize().multiplyScalar(RADIUS + 0.04);
+    const mid = pts[Math.floor(pts.length / 2)].clone().normalize().multiplyScalar(RADIUS + 0.005);
 
     // Capture original lineDistances for ants animation
     const lineDistAttr = line.geometry.getAttribute('lineDistance');
@@ -1242,6 +1279,7 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
   let isDragging = false;
   let lastX = 0, lastY = 0;
   let zoom = 2.4;
+  let targetZoom = 2.4;
   let velX = 0, velY = 0;
   const ZOOM_MIN = 1.5, ZOOM_MAX = 6;
 
@@ -1268,8 +1306,21 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
   });
   renderer.domElement.addEventListener('wheel', e => {
     e.preventDefault();
-    zoom += e.deltaY * 0.002;
-    zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom));
+    // Trackpad fires many small events with deltaY < ~10 (often DOM_DELTA_PIXEL).
+    // Mouse wheels send larger steps. Use a multiplier that feels right for both.
+    let factor;
+    if (e.deltaMode === 1) {
+      // Line-mode (older mice) — convert lines to "pixels"
+      factor = 0.04;
+    } else if (Math.abs(e.deltaY) < 30) {
+      // Likely trackpad / smooth wheel — fine control
+      factor = 0.0035;
+    } else {
+      // Notched mouse wheel — bigger step
+      factor = 0.0015;
+    }
+    targetZoom += e.deltaY * factor;
+    targetZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, targetZoom));
   }, { passive: false });
 
   renderer.domElement.style.cursor = 'grab';
@@ -1337,9 +1388,12 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
       rotX += velX;
       rotY += velY;
       rotX = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, rotX));
-      velX *= 0.92;
-      velY *= 0.92;
+      velX *= 0.88;
+      velY *= 0.88;
     }
+
+    // Smooth zoom toward target (gives trackpad-friendly feel)
+    zoom += (targetZoom - zoom) * 0.15;
 
     globeRoot.rotation.x = rotX;
     globeRoot.rotation.y = rotY;
@@ -1425,7 +1479,10 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
       // shrink when zoomed out (don't dominate the globe).
       const rawScale = Math.pow(2.2 / zoom, 1.6);
       const scale = Math.max(0.45, Math.min(2.0, rawScale));
-      m.wrap.style.transform = `scale(${scale})`;
+      // Scale the whole marker (icon + label) so spacing scales together.
+      // Need to preserve the centering translate(-50%, -50%).
+      m.el.style.transform = `translate(-50%, -50%) scale(${scale})`;
+      m.wrap.style.transform = '';  // reset any previous scale on wrap
     });
 
     // Effect target markers
@@ -1517,6 +1574,8 @@ const LAND_POLYS = [[[-59.57,-80.04],[-59.87,-80.55],[-60.16,-81.0],[-62.25,-80.
     sphere.material.needsUpdate = true;
     // Update edge colors
     refreshEdgeColors();
+    // Update vector overlay colors
+    coastMat.color.set(getCss('--land-stroke') || '#c0bbb1');
     // Update body bg
     document.body.style.background = getCss('--bg-grad');
     // Update WebGL clear color to match palette bg
